@@ -59,7 +59,7 @@ export default function Home() {
     }
 
     if (search.trim()) {
-      result = result.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+      result = result.filter(c => (c.name || "").toLowerCase().includes(search.toLowerCase()));
     }
 
     setFilteredChannels(result.slice(0, 60));
