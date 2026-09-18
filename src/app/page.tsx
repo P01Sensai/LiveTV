@@ -25,6 +25,7 @@ export default function Home() {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
   
   const [activeStream, setActiveStream] = useState<{url: string, name: string, id: string} | null>(null);
 
@@ -100,7 +101,18 @@ export default function Home() {
       {/* Premium Header */}
       <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border py-3 px-4 lg:px-6">
         <div className="w-full flex items-center justify-between gap-6">
-          <div className="flex items-center gap-3 shrink-0 cursor-pointer">
+          <div 
+            className="flex items-center gap-3 shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => {
+              setActiveStream(null);
+              if (typeof window !== "undefined") {
+                const url = new URL(window.location.href);
+                url.searchParams.delete("channel");
+                window.history.pushState({}, "", url.toString());
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          >
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center text-white shadow-lg shadow-primary/20">
               <Tv className="w-5 h-5" />
             </div>
@@ -118,23 +130,77 @@ export default function Home() {
               placeholder="Search channels, aarti, cricket, shows..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-surface border border-border text-text-main rounded-full py-2.5 pl-11 pr-12 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none text-sm transition-all placeholder:text-text-muted" 
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+              className="w-full bg-surface border border-border text-text-main rounded-full py-2.5 pl-11 pr-12 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none text-sm transition-all placeholder:text-text-muted relative z-50" 
             />
             {search && (
               <button 
                 onClick={() => setSearch("")}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-white transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-white transition-colors z-50"
               >
                 <X className="w-4 h-4" />
               </button>
             )}
+
+            {/* Live Search Dropdown */}
+            {isSearchFocused && search.trim() && (
+              <div className="absolute top-full left-0 w-full mt-2 bg-surface border border-border rounded-xl shadow-2xl overflow-hidden z-[100] max-h-[60vh] flex flex-col">
+                <div className="overflow-y-auto p-2 flex flex-col gap-1 w-full">
+                  {filteredChannels.length === 0 ? (
+                    <div className="p-4 text-center text-text-muted text-sm font-semibold">No channels found for "{search}"</div>
+                  ) : (
+                    filteredChannels.slice(0, 8).map(channel => (
+                      <button
+                        key={channel.id}
+                        onClick={() => {
+                          handlePlay(channel);
+                          setSearch("");
+                        }}
+                        className="flex items-center gap-3 p-2 hover:bg-surface-hover rounded-lg transition-colors text-left group border border-transparent hover:border-border"
+                      >
+                         <div className="w-10 h-10 shrink-0 bg-white rounded-lg p-1 flex items-center justify-center overflow-hidden">
+                           {/* eslint-disable-next-line @next/next/no-img-element */}
+                           <img 
+                             src={channel.logo || "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/TV-icon-2.svg/512px-TV-icon-2.svg.png"} 
+                             alt={channel.name}
+                             className="max-w-full max-h-full object-contain"
+                             onError={(e) => {
+                               (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/TV-icon-2.svg/512px-TV-icon-2.svg.png";
+                             }}
+                           />
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <div className="font-bold text-sm truncate text-text-main group-hover:text-primary transition-colors">{channel.name}</div>
+                           <div className="text-xs text-text-muted truncate flex items-center gap-1">
+                             <span className="w-1 h-1 rounded-full bg-live animate-pulse"></span>
+                             {channel.categories?.[0] || 'General'}
+                           </div>
+                         </div>
+                         <Play className="w-4 h-4 text-text-muted group-hover:text-primary transition-colors shrink-0 mr-2" />
+                      </button>
+                    ))
+                  )}
+                </div>
+                {filteredChannels.length > 8 && (
+                  <div className="bg-surface-hover p-2 text-center border-t border-border">
+                    <span className="text-xs font-semibold text-text-muted">Press Enter to see all {filteredChannels.length} results below</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="hidden md:flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-bold text-sm shadow-md">
-              M
-            </div>
-            <span className="text-sm font-semibold text-text-muted">Guest</span>
+            <button 
+              onClick={() => {
+                document.getElementById('all-channels-grid')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className="px-4 py-2 bg-surface hover:bg-surface-hover border border-border hover:border-primary/50 text-text-main hover:text-primary rounded-xl font-semibold transition-all text-sm flex items-center gap-2 shadow-sm"
+            >
+              <Tv className="w-4 h-4" />
+              All Channels
+            </button>
           </div>
         </div>
       </header>
@@ -235,14 +301,51 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Right Main Area: Video Player */}
+          {/* Right Main Area: Video Player or Welcome Banner */}
           <div className="order-1 lg:order-3 flex-1 w-full flex flex-col">
-            <VideoPlayer 
-              url={activeStream?.url || null} 
-              name={activeStream?.name || null} 
-              onToggleTheater={() => setIsSidebarOpen(!isSidebarOpen)}
-              isTheaterMode={!isSidebarOpen}
-            />
+            {activeStream ? (
+              <VideoPlayer 
+                url={activeStream.url} 
+                name={activeStream.name} 
+                onToggleTheater={() => setIsSidebarOpen(!isSidebarOpen)}
+                isTheaterMode={!isSidebarOpen}
+              />
+            ) : (
+              <div className="w-full aspect-video bg-gradient-to-br from-surface via-background to-surface rounded-2xl border border-border relative overflow-hidden flex flex-col items-center justify-center p-6 lg:p-8">
+                {/* Background decorative elements */}
+                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
+                  <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[100px] animate-pulse"></div>
+                  <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-live rounded-full blur-[100px] animate-[pulse_3s_infinite_1s]"></div>
+                </div>
+
+                <div className="relative z-10 flex flex-col items-center text-center w-full">
+                  <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full bg-surface-hover border border-border flex items-center justify-center mb-4 lg:mb-6 shadow-2xl">
+                    <Tv className="w-8 h-8 lg:w-10 lg:h-10 text-primary" />
+                  </div>
+                  <h2 className="text-2xl lg:text-4xl font-extrabold text-white mb-2 lg:mb-3">Welcome to Live<span className="text-primary">TV</span></h2>
+                  <p className="text-text-muted mb-6 lg:mb-8 max-w-md text-sm lg:text-base">Experience premium live broadcasting. Select a channel from the sidebar or start watching a trending stream below.</p>
+                  
+                  <div className="flex flex-wrap items-center justify-center gap-3 lg:gap-4 w-full max-w-2xl">
+                    {channels.filter(c => c.logo).slice(0, 3).map(channel => (
+                      <button
+                        key={channel.id}
+                        onClick={() => handlePlay(channel)}
+                        className="flex items-center gap-3 bg-surface/80 backdrop-blur-md border border-border hover:border-primary/50 hover:bg-surface-hover rounded-xl p-2.5 lg:p-3 transition-all group/btn shadow-lg hover:-translate-y-1 hover:shadow-primary/20 w-[45%] sm:w-48"
+                      >
+                        <img src={channel.logo} alt={channel.name} className="w-8 h-8 lg:w-10 lg:h-10 object-contain bg-white rounded p-1 shrink-0" />
+                        <div className="text-left flex-1 min-w-0">
+                          <div className="font-bold text-xs lg:text-sm truncate text-white group-hover/btn:text-primary transition-colors">{channel.name}</div>
+                          <div className="text-[10px] lg:text-xs text-text-muted truncate flex items-center gap-1 mt-0.5">
+                             <span className="w-1 h-1 rounded-full bg-live animate-pulse"></span>
+                             LIVE
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
         </div>
@@ -275,9 +378,9 @@ export default function Home() {
           </div>
 
           {/* Channels Grid (Now styled as premium cards) */}
-          <div>
+          <div id="all-channels-grid" className="scroll-mt-24">
             <div className="flex items-center gap-3 mb-6 border-l-4 border-primary pl-3">
-              <h2 className="text-xl font-bold">Recommended for You</h2>
+              <h2 className="text-xl font-bold">All Channels</h2>
             </div>
             
             {loading ? (
