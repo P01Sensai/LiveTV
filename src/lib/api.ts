@@ -37,11 +37,16 @@ export async function fetchIndianChannels(): Promise<MergedChannel[]> {
       }
     });
 
-    const indianChannels = channelsData.filter(
-      (c) => c.country === "IN" && streamsByChannel[c.id] && streamsByChannel[c.id].length > 0
+    const targetChannels = channelsData.filter(
+      (c) => {
+        const hasStreams = streamsByChannel[c.id] && streamsByChannel[c.id].length > 0;
+        const isIN = c.country === "IN";
+        const isAnime = c.name.toLowerCase().includes('anime') || (c.categories && c.categories.includes('animation'));
+        return hasStreams && (isIN || isAnime);
+      }
     );
 
-    return indianChannels.map((c) => ({
+    return targetChannels.map((c) => ({
       ...c,
       logo: logosByChannel[c.id] || "",
       streamUrl: streamsByChannel[c.id][0].url

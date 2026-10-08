@@ -8,6 +8,7 @@ import { Tv, Search, X, Play, Hash, Menu } from "lucide-react";
 
 const CATEGORIES = [
   { id: "all", label: "All Channels" },
+  { id: "anime", label: "Anime" },
   { id: "news", label: "News" },
   { id: "movies", label: "Movies" },
   { id: "sports", label: "Sports" },
@@ -66,12 +67,16 @@ export default function Home() {
     if (category !== "all") {
       result = result.filter(c => {
         const catStr = (c.categories || []).map(x => x.toLowerCase()).join(" ");
+        const nameStr = (c.name || "").toLowerCase();
+        
+        if (category === "anime" && (catStr.includes("animation") || nameStr.includes("anime"))) return true;
         if (category === "news" && catStr.includes("news")) return true;
         if (category === "movies" && catStr.includes("movies")) return true;
         if (category === "sports" && catStr.includes("sports")) return true;
         if (category === "religious" && catStr.includes("religious")) return true;
         if (category === "music" && catStr.includes("music")) return true;
         if (category === "kids" && (catStr.includes("kids") || catStr.includes("children"))) return true;
+        
         return false;
       });
     }

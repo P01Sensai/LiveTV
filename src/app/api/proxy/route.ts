@@ -31,30 +31,37 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return new NextResponse('Failed to fetch from upstream', { status: response.status });
+      return new NextResponse('Failed to fetch from upstream', { 
+        status: response.status,
+        headers: { 'Access-Control-Allow-Origin': '*' }
+      });
     }
 
     const contentType = response.headers.get('content-type') || '';
     
     // If it's an M3U8 playlist, we must rewrite the URIs to pass through our proxy
-    if (url.includes('.m3u8') || contentType.includes('mpegurl') || contentType.toLowerCase().includes('application/x-mpegurl')) {
+    if (url.includes('.m3u8') || contentType.includes('mpegurl') || contentType.toLowerCase().includes('application/x-mpegurl') || textLooksLikeM3u8(contentType, url)) {
       const text = await response.text();
-      const baseUrl = new URL(url);
+      // Use response.url as base to correctly handle any redirects that occurred
+      const baseUrl = new URL(response.url);
       
       const lines = text.split('\n');
       const rewrittenLines = lines.map(line => {
         const trimmed = line.trim();
         if (!trimmed) return line;
         
-        // Handle encryption keys
-        if (trimmed.startsWith('#EXT-X-KEY') && trimmed.includes('URI=')) {
-           const uriMatch = trimmed.match(/URI="([^"]+)"/);
-           if (uriMatch) {
-             const uri = uriMatch[1];
-             const absoluteUri = new URL(uri, baseUrl.href).href;
-             const proxyUri = `/api/proxy?url=${encodeURIComponent(absoluteUri)}`;
-             return trimmed.replace(uri, proxyUri);
-           }
+        // Handle ANY directive that contains a URI attribute
+        if (trimmed.startsWith('#EXT') && trimmed.includes('URI=')) {
+           return trimmed.replace(/URI="([^"]+)"/g, (match, uri) => {
+             try {
+               if (uri.startsWith('data:')) return match; // skip inline data
+               const absoluteUri = new URL(uri, baseUrl.href).href;
+               const proxyUri = `/api/proxy?url=${encodeURIComponent(absoluteUri)}`;
+               return `URI="${proxyUri}"`;
+             } catch(e) {
+               return match;
+             }
+           });
         }
 
         // Directives and comments remain unchanged
@@ -78,21 +85,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Security: Only allow video, audio, and specific playlist formats
-    const isSafeType = contentType.startsWith('video/') || 
-                       contentType.startsWith('audio/') || 
-                       contentType.startsWith('application/vnd.apple.mpegurl') ||
-                       contentType.startsWith('application/x-mpegurl') ||
-                       contentType.startsWith('application/octet-stream'); // Some streams use generic binary
-                       
-    if (!isSafeType) {
-      return new NextResponse('Invalid content type requested', { status: 403 });
-    }
-
-    // For video segments (.ts), stream them back directly
+    // For video segments (.ts) or any other proxied content, stream it back directly.
+    // We removed the strict content-type check because many free IPTV servers 
+    // misconfigure their headers and return text/plain or missing types for video chunks.
     return new NextResponse(response.body, {
       headers: {
-        'Content-Type': contentType,
+        'Content-Type': contentType || 'application/octet-stream',
         'Access-Control-Allow-Origin': '*',
         'Cache-Control': 'public, max-age=3600',
       }
@@ -100,6 +98,14 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error("Proxy error:", error);
-    return new NextResponse(error.message, { status: 500 });
+    return new NextResponse(error.message, { 
+      status: 500,
+      headers: { 'Access-Control-Allow-Origin': '*' }
+    });
   }
+}
+
+// Helper to guess if content is m3u8 if headers are missing
+function textLooksLikeM3u8(contentType: string, url: string) {
+  return url.toLowerCase().includes('.m3u8');
 }
