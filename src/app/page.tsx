@@ -317,10 +317,23 @@ export default function Home() {
               />
             ) : (
               <div className="w-full aspect-video bg-gradient-to-br from-surface via-background to-surface rounded-2xl border border-border relative overflow-hidden flex flex-col items-center justify-center p-6 lg:p-8">
-                {/* Background decorative elements */}
-                <div className="absolute top-0 left-0 w-full h-full overflow-hidden opacity-20 pointer-events-none">
-                  <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-primary rounded-full blur-[100px] animate-pulse"></div>
-                  <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-live rounded-full blur-[100px] animate-[pulse_3s_infinite_1s]"></div>
+                {/* Zero-Lag Background decorative elements (Native Radial Gradients, 0 blur) */}
+                <div 
+                  className="absolute inset-0 overflow-hidden pointer-events-none opacity-30"
+                  style={{ contain: 'strict', transform: 'translateZ(0)' }}
+                >
+                  <div 
+                    className="absolute -top-[30%] -left-[20%] w-[80%] h-[80%] rounded-full pointer-events-none"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(255, 90, 38, 0.5) 0%, rgba(255, 90, 38, 0.12) 40%, transparent 70%)',
+                    }}
+                  />
+                  <div 
+                    className="absolute -bottom-[30%] -right-[20%] w-[80%] h-[80%] rounded-full pointer-events-none"
+                    style={{
+                      background: 'radial-gradient(circle, rgba(255, 46, 46, 0.4) 0%, rgba(255, 46, 46, 0.1) 40%, transparent 70%)',
+                    }}
+                  />
                 </div>
 
                 <div className="relative z-10 flex flex-col items-center text-center w-full">

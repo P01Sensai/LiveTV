@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
-import { AlertCircle, RefreshCcw, Maximize, Play, Pause, Volume2, VolumeX, RectangleHorizontal } from "lucide-react";
+import { AlertCircle, RefreshCcw, Maximize, Play, Pause, Volume2, VolumeX, RectangleHorizontal, Sparkles } from "lucide-react";
 
 interface VideoPlayerProps {
   url: string | null;
@@ -11,12 +11,97 @@ interface VideoPlayerProps {
   isTheaterMode?: boolean;
 }
 
+function getBoostedColor(r: number, g: number, b: number): string {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0;
+  if (max !== min) {
+    const d = max - min;
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / d + 2) * 60;
+    else h = ((r - g) / d + 4) * 60;
+  }
+  const isGrayscale = (max - min) < 18;
+  if (isGrayscale) {
+    if (max < 30) return "rgba(255, 90, 38, 0.45)"; // Warm ambient fallback for dark scenes
+    return `rgba(${r}, ${g}, ${b}, 0.55)`;
+  }
+  return `hsla(${Math.round(h)}, 95%, 55%, 0.75)`;
+}
+
+const DEFAULT_AMBIENT = 
+  "radial-gradient(circle at 15% 15%, rgba(255, 90, 38, 0.65) 0%, transparent 65%), " +
+  "radial-gradient(circle at 85% 15%, rgba(255, 46, 46, 0.55) 0%, transparent 65%), " +
+  "radial-gradient(circle at 15% 85%, rgba(255, 90, 38, 0.55) 0%, transparent 65%), " +
+  "radial-gradient(circle at 85% 85%, rgba(255, 46, 46, 0.65) 0%, transparent 65%)";
+
 export default function VideoPlayer({ url, name, onToggleTheater, isTheaterMode }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isAtLiveEdge, setIsAtLiveEdge] = useState(true);
+  const [ambientEnabled, setAmbientEnabled] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [ambientGradient, setAmbientGradient] = useState<string>(DEFAULT_AMBIENT);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  // Zero-lag 4-Corner Edge Color Sync (Sampled once every 800ms onto a 2x2 grid)
+  useEffect(() => {
+    if (!ambientEnabled || isFullscreen) return;
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!offscreenCanvasRef.current) {
+      const c = document.createElement("canvas");
+      c.width = 2;
+      c.height = 2;
+      offscreenCanvasRef.current = c;
+    }
+    const canvas = offscreenCanvasRef.current;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+
+    let timer: NodeJS.Timeout;
+
+    const sample = () => {
+      if (video.readyState >= 2 && !video.paused && !video.ended) {
+        try {
+          ctx.drawImage(video, 0, 0, 2, 2);
+          const px = ctx.getImageData(0, 0, 2, 2).data;
+          const cTL = getBoostedColor(px[0], px[1], px[2]);
+          const cTR = getBoostedColor(px[4], px[5], px[6]);
+          const cBL = getBoostedColor(px[8], px[9], px[10]);
+          const cBR = getBoostedColor(px[12], px[13], px[14]);
+
+          setAmbientGradient(
+            `radial-gradient(circle at 15% 15%, ${cTL} 0%, transparent 65%), ` +
+            `radial-gradient(circle at 85% 15%, ${cTR} 0%, transparent 65%), ` +
+            `radial-gradient(circle at 15% 85%, ${cBL} 0%, transparent 65%), ` +
+            `radial-gradient(circle at 85% 85%, ${cBR} 0%, transparent 65%)`
+          );
+        } catch {
+          // If CORS security blocks canvas read, safely keep existing gradient
+        }
+      }
+      timer = setTimeout(sample, 800);
+    };
+
+    timer = setTimeout(sample, 600);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [ambientEnabled, isFullscreen]);
 
   const goLive = () => {
     if (videoRef.current) {
@@ -143,9 +228,27 @@ export default function VideoPlayer({ url, name, onToggleTheater, isTheaterMode 
   }
 
   return (
-    <div className="w-full flex flex-col">
+    <div className="w-full flex flex-col relative isolate">
+      {/* Zero-Lag 4-Corner Hardware-Accelerated Ambilight (Native CSS Gradient Mesh) */}
+      <div
+        aria-hidden="true"
+        className={`absolute -inset-8 sm:-inset-14 lg:-inset-20 z-0 pointer-events-none rounded-[3rem] transition-opacity duration-1000 ease-out ${
+          ambientEnabled && !isFullscreen
+            ? isPlaying ? "opacity-85" : "opacity-35"
+            : "opacity-0"
+        }`}
+        style={{
+          background: ambientGradient,
+          transform: 'translateZ(0)',
+          contain: 'strict',
+          filter: 'blur(36px)',
+          willChange: 'opacity, background',
+          transition: 'background 1s ease, opacity 0.7s ease',
+        }}
+      />
+
       {/* Video Container */}
-      <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-border group">
+      <div className="relative z-10 w-full aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-border group">
         
         {error && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm p-6 text-center z-20">
@@ -166,6 +269,7 @@ export default function VideoPlayer({ url, name, onToggleTheater, isTheaterMode 
           className="w-full h-full object-contain"
           autoPlay
           playsInline
+          crossOrigin="anonymous"
           onPlay={() => setIsPlaying(true)}
           onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}
@@ -197,7 +301,16 @@ export default function VideoPlayer({ url, name, onToggleTheater, isTheaterMode 
               </div>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setAmbientEnabled(!ambientEnabled)} 
+                className={`transition-colors p-2 rounded-full backdrop-blur-md ${
+                  ambientEnabled ? 'bg-primary/25 text-primary' : 'bg-white/10 text-white/50 hover:text-white'
+                }`}
+                title={ambientEnabled ? "Ambient Glow: On (Click to turn off)" : "Ambient Glow: Off (Click to turn on)"}
+              >
+                <Sparkles className="w-5 h-5" />
+              </button>
               {onToggleTheater && (
                 <button 
                   onClick={onToggleTheater} 
@@ -219,7 +332,7 @@ export default function VideoPlayer({ url, name, onToggleTheater, isTheaterMode 
       </div>
 
       {/* Title & Metadata (Below Video) */}
-      <div className="mt-4 flex flex-col md:flex-row md:items-start justify-between gap-4">
+      <div className="relative z-10 mt-4 flex flex-col md:flex-row md:items-start justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-text-main">{name}</h2>
           <p className="text-text-muted mt-1">LiveTV Broadcast</p>
