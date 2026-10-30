@@ -44,5 +44,6 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 
-# Ignore all markdown files
+# Ignore all markdown files except README
 *.md
+!README.md
