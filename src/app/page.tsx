@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { fetchIndianChannels } from "@/lib/api";
 import { MergedChannel } from "@/lib/types";
 import VideoPlayer from "@/components/VideoPlayer";
+import ChannelCard from "@/components/ChannelCard";
 import { Tv, Search, X, Play, Hash, Menu } from "lucide-react";
 
 const CATEGORIES = [
@@ -398,7 +399,14 @@ export default function Home() {
           {/* Channels Grid (Now styled as premium cards) */}
           <div id="all-channels-grid" className="scroll-mt-24">
             <div className="flex items-center gap-3 mb-6 border-l-4 border-primary pl-3">
-              <h2 className="text-xl font-bold">All Channels</h2>
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                {category === "anime" ? "Anime Broadcasts 「アニメ」" : "All Channels"}
+                {category === "anime" && (
+                  <span className="text-xs bg-primary/20 text-primary border border-primary/40 px-2 py-0.5 rounded-full font-black">
+                    24/7 Global Feeds
+                  </span>
+                )}
+              </h2>
             </div>
             
             {loading ? (
@@ -408,39 +416,12 @@ export default function Home() {
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {filteredChannels.slice(0, 30).map(channel => (
-                  <button
+                  <ChannelCard
                     key={channel.id}
-                    onClick={() => handlePlay(channel)}
-                    className="flex flex-col items-center justify-between gap-0 p-0 bg-surface border border-border rounded-xl hover:border-primary/50 transition-all group focus:outline-none overflow-hidden relative shadow-md hover:shadow-primary/10 hover:-translate-y-1"
-                  >
-                    <div className="absolute top-2 left-2 bg-live text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm z-10">
-                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span> LIVE
-                    </div>
-                    
-                    <div className="w-full aspect-video bg-white flex items-center justify-center overflow-hidden p-4">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img 
-                        src={channel.logo || "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/TV-icon-2.svg/512px-TV-icon-2.svg.png"} 
-                        alt={channel.name} 
-                        className="max-w-full max-h-[80%] object-contain group-hover:scale-105 transition-transform duration-500"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/11/TV-icon-2.svg/512px-TV-icon-2.svg.png";
-                        }}
-                      />
-                    </div>
-                    <div className="w-full p-3 bg-surface border-t border-border flex flex-col gap-1 items-start">
-                      <h3 className="text-sm font-bold text-left group-hover:text-primary transition-colors line-clamp-1 w-full">
-                        {channel.name}
-                      </h3>
-                      <p className="text-xs text-text-muted line-clamp-1 text-left w-full">
-                        {channel.categories?.[0] || 'General'} • India
-                      </p>
-                      
-                      <div className="w-full mt-3 bg-surface-hover hover:bg-primary border border-border hover:border-primary text-text-main hover:text-white py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-1">
-                        <Play className="w-3 h-3" /> Watch Now
-                      </div>
-                    </div>
-                  </button>
+                    channel={channel}
+                    onPlay={handlePlay}
+                    isAnimeMode={category === "anime"}
+                  />
                 ))}
               </div>
             )}
