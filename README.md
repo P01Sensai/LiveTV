@@ -47,6 +47,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-##  License
+## 📜 License
 
 MIT License. Streams and logos are sourced from publicly available channels via `iptv-org`.
